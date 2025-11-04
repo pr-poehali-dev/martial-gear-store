@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
 
 type Sport = 'all' | 'boxing' | 'mma' | 'karate' | 'judo';
 
@@ -13,6 +15,10 @@ interface Product {
   sport: Sport;
   image: string;
   category: string;
+}
+
+interface CartItem extends Product {
+  quantity: number;
 }
 
 const products: Product[] = [
@@ -69,6 +75,41 @@ const products: Product[] = [
 const Index = () => {
   const [selectedSport, setSelectedSport] = useState<Sport>('all');
   const [activeSection, setActiveSection] = useState<'home' | 'catalog' | 'delivery' | 'contacts'>('home');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  const addToCart = (product: Product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prevCart, { ...product, quantity: 1 }];
+    });
+  };
+
+  const removeFromCart = (productId: number) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  };
+
+  const updateQuantity = (productId: number, newQuantity: number) => {
+    if (newQuantity === 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const filteredProducts = selectedSport === 'all' 
     ? products 
@@ -118,10 +159,101 @@ const Index = () => {
             </button>
           </nav>
 
-          <Button size="sm" className="gap-2">
-            <Icon name="ShoppingCart" size={18} />
-            Корзина
-          </Button>
+          <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
+            <SheetTrigger asChild>
+              <Button size="sm" className="gap-2 relative">
+                <Icon name="ShoppingCart" size={18} />
+                Корзина
+                {totalItems > 0 && (
+                  <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 bg-accent">
+                    {totalItems}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-lg">
+              <SheetHeader>
+                <SheetTitle className="text-2xl">Корзина</SheetTitle>
+              </SheetHeader>
+              
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                  <Icon name="ShoppingCart" className="text-muted-foreground mb-4" size={64} />
+                  <p className="text-lg text-muted-foreground">Корзина пуста</p>
+                  <p className="text-sm text-muted-foreground mt-2">Добавьте товары из каталога</p>
+                </div>
+              ) : (
+                <div className="flex flex-col h-full">
+                  <div className="flex-1 overflow-y-auto py-6 space-y-4">
+                    {cart.map((item) => (
+                      <div key={item.id} className="flex gap-4">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-md"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                          <p className="font-bold text-primary mt-1">{item.price.toLocaleString()} ₽</p>
+                        </div>
+                        <div className="flex flex-col items-end justify-between">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFromCart(item.id)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Icon name="X" size={16} />
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Icon name="Minus" size={14} />
+                            </Button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Icon name="Plus" size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Separator className="my-4" />
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between text-lg">
+                      <span className="font-medium">Товары ({totalItems}):</span>
+                      <span className="font-bold">{totalPrice.toLocaleString()} ₽</span>
+                    </div>
+                    
+                    {totalPrice >= 5000 && (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-2">
+                        <Icon name="CheckCircle" className="text-green-500" size={20} />
+                        <p className="text-sm text-green-700">Бесплатная доставка!</p>
+                      </div>
+                    )}
+                    
+                    <Button className="w-full" size="lg">
+                      Оформить заказ
+                      <Icon name="ArrowRight" className="ml-2" size={20} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
@@ -239,7 +371,7 @@ const Index = () => {
                   <h3 className="font-semibold text-lg mb-2">{product.name}</h3>
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold text-primary">{product.price.toLocaleString()} ₽</span>
-                    <Button size="sm" className="gap-2">
+                    <Button size="sm" className="gap-2" onClick={() => addToCart(product)}>
                       <Icon name="ShoppingCart" size={16} />
                       В корзину
                     </Button>
